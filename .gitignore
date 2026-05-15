@@ -1,0 +1,9 @@
+# Outils de fabrication/test — NE FONT PAS PARTIE DU JEU, non publiés
+tools/
+
+# Images sources (lourdes) ; le jeu n'utilise que assets/alphonse.png
+Images/
+
+# Config locale Claude Code / skills — pas nécessaire au jeu publié
+.claude/
+.plans/
