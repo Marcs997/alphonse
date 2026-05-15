@@ -4,6 +4,9 @@ tools/
 # Images sources (lourdes) ; le jeu n'utilise que assets/alphonse.png
 Images/
 
+# Assets bruts fournis ; copiés dans assets/ pour le jeu
+assets_CD/
+
 # Config locale Claude Code / skills — pas nécessaire au jeu publié
 .claude/
 .plans/
