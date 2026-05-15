@@ -119,15 +119,23 @@ const TREES = [];
 (function makeTrees() {
   const f = CONFIG.field;
   const add = (x, y, s) => TREES.push({ x, y, s });
-  // Haut
-  for (let i = 0; i <= 6; i++) add(60 + i * 100, 110, 1.05 - (i % 2) * 0.12);
-  // Bas
-  for (let i = 0; i <= 6; i++) add(60 + i * 100, WORLD_H - 70, 1.05 - (i % 2) * 0.12);
-  // Côtés
-  for (let i = 0; i < 6; i++) {
-    const y = f.y + 40 + i * 165;
-    add(45, y, 1.0 - (i % 2) * 0.1);
-    add(WORLD_W - 45, y, 1.0 - (i % 2) * 0.1);
+
+  // Haut : rangée du fond (petits) + rangée avant décalée (couronne fournie)
+  for (let i = 0; i <= 12; i++) add(20 + i * 60, 62, 0.82 - (i % 2) * 0.06);
+  for (let i = 0; i <= 11; i++) add(50 + i * 60, 122, 1.06 - (i % 2) * 0.12);
+
+  // Bas : idem, deux rangées
+  for (let i = 0; i <= 12; i++) add(20 + i * 60, WORLD_H - 96, 0.82 - (i % 2) * 0.06);
+  for (let i = 0; i <= 11; i++) add(50 + i * 60, WORLD_H - 44, 1.06 - (i % 2) * 0.12);
+
+  // Côtés : deux colonnes décalées de chaque bord
+  const n = 11;
+  for (let i = 0; i < n; i++) {
+    const y = f.y - 10 + i * ((f.h + 40) / (n - 1));
+    add(34, y, 1.02 - (i % 2) * 0.1);
+    add(86, y + 28, 0.78 - (i % 2) * 0.05);
+    add(WORLD_W - 34, y, 1.02 - (i % 2) * 0.1);
+    add(WORLD_W - 86, y + 28, 0.78 - (i % 2) * 0.05);
   }
 })();
 

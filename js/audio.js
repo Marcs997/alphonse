@@ -42,18 +42,23 @@ const Audio = {
     const base = kind === "wood" ? 523.25 : 659.25; // Do5 / Mi5
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.22, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
-    g.connect(this.master);
-    [1, 2, 3].forEach((mult, i) => {
+    g.gain.exponentialRampToValueAtTime(0.09, t + 0.03);   // plus doux, moins fort
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    // petit filtre passe-bas pour enlever le côté "brut"
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 2200;
+    lp.connect(this.master);
+    g.connect(lp);
+    [1, 2].forEach((mult, i) => {
       const o = this.ctx.createOscillator();
       o.type = "sine";
       o.frequency.value = base * mult;
       const og = this.ctx.createGain();
-      og.gain.value = [0.6, 0.25, 0.12][i];
+      og.gain.value = [0.5, 0.12][i];                       // moins d'harmoniques
       o.connect(og).connect(g);
       o.start(t);
-      o.stop(t + 0.6);
+      o.stop(t + 0.75);
     });
   },
 
