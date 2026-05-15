@@ -60,6 +60,7 @@ const state = {
   woods: [],
   cabins: [],
   particles: [],
+  sparkles: [],                  // étoiles SVG à la récolte
   floats: [],                    // textes "+10" / "+3" qui montent
 
   grassTimer: 1.0,
@@ -71,15 +72,47 @@ const state = {
   time: 0,
 };
 
-// Touffes d'herbe décoratives (fixes, juste pour le fond)
-const DECO_TUFTS = [];
-(function makeTufts() {
-  let seed = 1234;
-  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-  for (let i = 0; i < 70; i++) {
-    DECO_TUFTS.push({ x: rnd() * WORLD_W, y: 140 + rnd() * (WORLD_H - 180), s: 0.7 + rnd() * 0.7 });
-  }
+// Petit générateur aléatoire reproductible (même décor à chaque partie)
+let _seed = 20260515;
+const rnd = () => { _seed = (_seed * 1103515245 + 12345) & 0x7fffffff; return _seed / 0x7fffffff; };
+
+// Décor d'ambiance fixe (fleurs, champignons, pierres, buissons) posé au sol,
+// sans gêner le jeu. Trié par Y pour un rendu naturel.
+const DECOR = [];
+(function makeDecor() {
+  const f = CONFIG.field;
+  const place = (key, n, hMin, hMax, pad) => {
+    for (let i = 0; i < n; i++) {
+      let x, y, ok = false;
+      for (let t = 0; t < 30 && !ok; t++) {
+        x = f.x + pad + rnd() * (f.w - pad * 2);
+        y = f.y + pad + rnd() * (f.h - pad * 2);
+        ok = !inAnyPond(x, y, 18);
+      }
+      DECOR.push({ key, x, y, h: hMin + rnd() * (hMax - hMin) });
+    }
+  };
+  place("flower", 16, 34, 46, 30);
+  place("mushroom", 7, 34, 46, 36);
+  place("stone", 6, 40, 56, 40);
+  place("bush", 9, 70, 92, 30);
+  DECOR.sort((a, b) => a.y - b.y);
 })();
+
+// Clôture en bas (clin d'œil à l'affiche), posée le long du bord bas
+const FENCE = [];
+(function makeFence() {
+  const f = CONFIG.field;
+  const y = f.y + f.h + 24;
+  for (let i = 0; i <= 8; i++) FENCE.push({ x: f.x + 10 + i * (f.w - 20) / 8, y });
+})();
+
+// Nuages qui dérivent doucement (très translucides, pour la vie)
+const CLOUDS = [];
+for (let i = 0; i < 3; i++) {
+  CLOUDS.push({ x: rnd() * WORLD_W, y: 160 + rnd() * (WORLD_H - 300),
+                v: 7 + rnd() * 6, h: 150 + rnd() * 90 });
+}
 
 // Arbres en couronne autour de la zone jouable
 const TREES = [];
@@ -117,6 +150,7 @@ function toWorld(clientX, clientY) {
 // Zones cliquables du HUD (en coordonnées du monde)
 // ----------------------------------------------------------------------------
 const BUILD_BTN = { x: 210, y: 1148, w: 300, h: 104 };
+const MUTE_BTN = { x: WORLD_W - 92, y: 124, w: 72, h: 72 };
 
 function pointInRect(px, py, r) {
   return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
@@ -127,7 +161,11 @@ function pointInRect(px, py, r) {
 // ----------------------------------------------------------------------------
 canvas.addEventListener("pointerdown", (e) => {
   e.preventDefault();
+  Audio.unlock();                       // démarre le son au 1er toucher (mobile)
   const p = toWorld(e.clientX, e.clientY);
+
+  // Bouton son (toujours accessible)
+  if (pointInRect(p.x, p.y, MUTE_BTN)) { Audio.toggleMute(); return; }
 
   if (state.mode === "placing") {
     // En mode pose : le bouton sert à annuler
@@ -255,6 +293,7 @@ function update(dt) {
     if (dist2(a.x, a.y, g.x, g.y) < (ar + g.r) ** 2) {
       state.score += CONFIG.grass.points;
       collectFx(g.x, g.y, "#bff07a", "+" + CONFIG.grass.points);
+      Audio.chime("grass");
       state.grasses.splice(i, 1);
     }
   }
@@ -264,6 +303,7 @@ function update(dt) {
       state.wood += CONFIG.wood.points;
       if (!state.woodUnlocked) { state.woodUnlocked = true; state.woodTimer = 0.4; }
       collectFx(w.x, w.y, "#f0c060", "+" + CONFIG.wood.points);
+      Audio.chime("wood");
       state.woods.splice(i, 1);
     }
   }
@@ -274,10 +314,21 @@ function update(dt) {
     p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 320 * dt; p.life -= dt;
     if (p.life <= 0) state.particles.splice(i, 1);
   }
+  for (let i = state.sparkles.length - 1; i >= 0; i--) {
+    const s = state.sparkles[i];
+    s.y -= 30 * dt; s.rot += 3 * dt; s.life -= dt;
+    if (s.life <= 0) state.sparkles.splice(i, 1);
+  }
   for (let i = state.floats.length - 1; i >= 0; i--) {
     const fl = state.floats[i];
     fl.y -= 55 * dt; fl.life -= dt;
     if (fl.life <= 0) state.floats.splice(i, 1);
+  }
+
+  // Nuages qui dérivent (et reviennent de l'autre côté)
+  for (const c of CLOUDS) {
+    c.x += c.v * dt;
+    if (c.x > WORLD_W + 200) c.x = -200;
   }
 }
 
@@ -289,38 +340,82 @@ function collectFx(x, y, color, label) {
       life: rand(0.4, 0.8), color,
     });
   }
+  for (let i = 0; i < 4; i++) {
+    state.sparkles.push({
+      x: x + rand(-26, 26), y: y + rand(-26, 10),
+      life: rand(0.5, 0.9), rot: rand(0, 6.28), h: rand(26, 40),
+    });
+  }
   state.floats.push({ x, y: y - 30, life: 1.0, label, color });
 }
 
 // ----------------------------------------------------------------------------
 // Dessin
 // ----------------------------------------------------------------------------
+let _grassPattern = null;
 function draw() {
-  // --- Fond : prairie en dégradé ---
-  const g = ctx.createLinearGradient(0, 0, 0, WORLD_H);
-  g.addColorStop(0, "#9bd866");
-  g.addColorStop(1, "#74bf4c");
-  ctx.fillStyle = g;
+  // --- Fond : tuile d'herbe répétée (sinon dégradé de secours) ---
+  if (!_grassPattern && Assets.images.tile && Assets.images.tile.width) {
+    _grassPattern = ctx.createPattern(Assets.images.tile, "repeat");
+  }
+  if (_grassPattern) {
+    ctx.fillStyle = _grassPattern;
+  } else {
+    const g = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+    g.addColorStop(0, "#9bd866"); g.addColorStop(1, "#74bf4c");
+    ctx.fillStyle = g;
+  }
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  // Touffes d'herbe décoratives
-  for (const t of DECO_TUFTS) drawTuft(t.x, t.y, t.s, "#69b048");
-
   // --- Mares ---
-  for (const p of PONDS) drawPond(p);
+  for (const p of PONDS) {
+    if (!Assets.draw(ctx, "pond", p.x, p.y, p.rx * 1.7)) drawPondFallback(p);
+  }
+
+  // --- Décor d'ambiance posé au sol (trié par Y) ---
+  for (const d of DECOR) Assets.draw(ctx, d.key, d.x, d.y, d.h, 1);
 
   // --- Cabanes ---
-  for (const c of state.cabins) drawCabin(c.x, c.y, c.w, c.h, 1);
+  for (const c of state.cabins) {
+    if (!Assets.draw(ctx, "cabin", c.x, c.y, c.h * 1.55, 1)) drawCabinFallback(c);
+  }
 
   // --- Arbres en couronne ---
-  for (const t of TREES) drawTree(t.x, t.y, t.s);
+  for (const t of TREES) {
+    if (!Assets.draw(ctx, "tree", t.x, t.y, 170 * t.s, 1)) drawTreeFallback(t.x, t.y, t.s);
+  }
+
+  // --- Clôture du bas ---
+  for (const fp of FENCE) Assets.draw(ctx, "fence", fp.x, fp.y, 64, 1);
 
   // --- Objets à récolter (aura pulsante + objet) ---
-  for (const w of state.woods) { drawAura(w.x, w.y, 1.25); drawWood(w.x, w.y); }
-  for (const gr of state.grasses) { drawAura(gr.x, gr.y, 1.0); drawGrass(gr.x, gr.y); }
+  for (const w of state.woods) {
+    drawAura(w.x, w.y, 1.25);
+    if (!Assets.draw(ctx, "wood", w.x, w.y - 10, 62)) drawWoodFallback(w.x, w.y);
+  }
+  for (const gr of state.grasses) {
+    drawAura(gr.x, gr.y, 1.0);
+    if (!Assets.draw(ctx, "grass", gr.x, gr.y - 8, 60, 1)) drawGrassFallback(gr.x, gr.y);
+  }
 
   // --- Alphonse ---
   drawAlphonse();
+
+  // --- Étoiles de récolte ---
+  for (const s of state.sparkles) {
+    ctx.save();
+    ctx.globalAlpha = clamp(s.life * 1.5, 0, 1);
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot);
+    Assets.draw(ctx, "sparkle", 0, 0, s.h);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+
+  // --- Nuages translucides qui dérivent ---
+  ctx.globalAlpha = 0.22;
+  for (const c of CLOUDS) Assets.draw(ctx, "cloud", c.x, c.y, c.h);
+  ctx.globalAlpha = 1;
 
   // --- Particules + textes flottants ---
   for (const p of state.particles) {
@@ -346,8 +441,8 @@ function draw() {
     const gx = clamp(state.ghost.x, f.x + c.w / 2, f.x + f.w - c.w / 2);
     const gy = clamp(state.ghost.y, f.y + c.h, f.y + f.h);
     const ok = !inAnyPond(gx, gy, 10);
-    ctx.globalAlpha = 0.55;
-    drawCabin(gx, gy, c.w, c.h, ok ? 1 : 0.3);
+    ctx.globalAlpha = ok ? 0.55 : 0.22;
+    if (!Assets.draw(ctx, "cabin", gx, gy, c.h * 1.55, 1)) drawCabinFallback({ x: gx, y: gy, w: c.w, h: c.h });
     ctx.globalAlpha = 1;
   }
 
@@ -385,12 +480,12 @@ function drawTuft(x, y, s, color) {
   }
 }
 
-function drawGrass(x, y) {
+function drawGrassFallback(x, y) {
   drawTuft(x, y + 10, 1.7, "#3f8f2e");
   drawTuft(x + 8, y + 12, 1.4, "#4ea336");
 }
 
-function drawWood(x, y) {
+function drawWoodFallback(x, y) {
   ctx.save();
   ctx.translate(x, y);
   ctx.fillStyle = "#9c6b3b";
@@ -408,7 +503,7 @@ function drawWood(x, y) {
   ctx.restore();
 }
 
-function drawPond(p) {
+function drawPondFallback(p) {
   ctx.save();
   ctx.fillStyle = "#5fae4a";
   ctx.beginPath(); ctx.ellipse(p.x, p.y + 6, p.rx + 9, p.ry + 7, 0, 0, 6.283); ctx.fill();
@@ -422,7 +517,7 @@ function drawPond(p) {
   ctx.restore();
 }
 
-function drawTree(x, y, s) {
+function drawTreeFallback(x, y, s) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
@@ -441,9 +536,8 @@ function drawTree(x, y, s) {
   ctx.restore();
 }
 
-function drawCabin(x, y, w, h, alpha) {
+function drawCabinFallback({ x, y, w, h }) {
   ctx.save();
-  ctx.globalAlpha *= alpha;
   ctx.translate(x, y);
   // ombre
   ctx.fillStyle = "rgba(40,70,30,.20)";
@@ -533,21 +627,17 @@ function drawHUD() {
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
 
-  // Score (herbe)
-  drawTuft(58, 80, 1.5, "#3f8f2e");
+  // Score (icône herbe)
+  if (!Assets.draw(ctx, "grass", 56, 78, 56)) drawTuft(56, 80, 1.5, "#3f8f2e");
   ctx.fillStyle = "#2f6d22";
   ctx.font = "bold 40px system-ui, sans-serif";
-  ctx.fillText("Score " + state.score, 86, 64);
+  ctx.fillText("Score " + state.score, 88, 64);
 
-  // Bois
-  ctx.save();
-  ctx.translate(WORLD_W - 250, 56);
-  ctx.scale(0.62, 0.62);
-  drawWood(0, 8);
-  ctx.restore();
+  // Bois (icône bûche)
+  if (!Assets.draw(ctx, "wood", WORLD_W - 250, 64, 52)) drawWoodFallback(WORLD_W - 250, 64);
   ctx.fillStyle = "#7c5128";
   ctx.font = "bold 40px system-ui, sans-serif";
-  ctx.fillText("Bois " + state.wood, WORLD_W - 210, 64);
+  ctx.fillText("Bois " + state.wood, WORLD_W - 214, 64);
 
   // Bouton du bas
   const b = BUILD_BTN;
@@ -574,7 +664,42 @@ function drawHUD() {
     ctx.fillText("Touche un endroit pour poser la cabane", WORLD_W / 2, 1126);
   }
 
+  // Bouton son
+  drawMuteButton();
+
   ctx.textBaseline = "alphabetic";
+}
+
+function drawMuteButton() {
+  const m = MUTE_BTN, cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+  ctx.fillStyle = "rgba(0,0,0,.15)";
+  ctx.beginPath(); ctx.arc(cx, cy + 3, m.w / 2, 0, 6.283); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.beginPath(); ctx.arc(cx, cy, m.w / 2, 0, 6.283); ctx.fill();
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = "#5a3a12";
+  ctx.strokeStyle = "#5a3a12";
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  // haut-parleur
+  ctx.beginPath();
+  ctx.moveTo(-15, -7); ctx.lineTo(-6, -7); ctx.lineTo(3, -16);
+  ctx.lineTo(3, 16); ctx.lineTo(-6, 7); ctx.lineTo(-15, 7);
+  ctx.closePath(); ctx.fill();
+  if (Audio.muted) {
+    // croix = coupé
+    ctx.beginPath();
+    ctx.moveTo(10, -10); ctx.lineTo(22, 10);
+    ctx.moveTo(22, -10); ctx.lineTo(10, 10);
+    ctx.stroke();
+  } else {
+    // ondes
+    ctx.beginPath(); ctx.arc(6, 0, 9, -0.8, 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.arc(6, 0, 16, -0.7, 0.7); ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // Rectangle à coins arrondis (utilitaire de dessin)

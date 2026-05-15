@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128">
+  <defs>
+    <linearGradient id="gG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a8dc7a"></stop>
+      <stop offset="1" stop-color="#5fa84a"></stop>
+    </linearGradient>
+  </defs>
+  
+  <ellipse cx="32" cy="55" rx="18" ry="3.2" fill="#000" opacity="0.12"></ellipse>
+  
+  <path d="M14 54 C16 38 22 30 24 22 C20 34 22 46 20 54 Z" fill="#6cb556" stroke="#3e7a35" stroke-width="1.5" stroke-linejoin="round"></path>
+  <path d="M50 54 C48 38 42 30 40 22 C44 34 42 46 44 54 Z" fill="#6cb556" stroke="#3e7a35" stroke-width="1.5" stroke-linejoin="round"></path>
+  
+  <path d="M22 55 C24 36 30 24 32 14 C30 28 32 44 28 55 Z" fill="url(#gG)" stroke="#3e7a35" stroke-width="1.6" stroke-linejoin="round"></path>
+  <path d="M42 55 C40 36 34 24 32 14 C34 28 32 44 36 55 Z" fill="url(#gG)" stroke="#3e7a35" stroke-width="1.6" stroke-linejoin="round"></path>
+  
+  <path d="M28 55 C30 40 32 28 32 10 C32 30 34 44 36 55 Z" fill="#8ecc6a" stroke="#3e7a35" stroke-width="1.6" stroke-linejoin="round"></path>
+  
+  <path d="M31 14 C31 28 30 42 30 50" stroke="#cdefa6" stroke-width="1.2" stroke-linecap="round" fill="none"></path>
+</svg>
