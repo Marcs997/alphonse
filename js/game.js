@@ -17,7 +17,7 @@ const WORLD_H = 1280;
 
 // --- Tous les réglages ajustables en un seul endroit (pour l'équilibrage) ---
 const CONFIG = {
-  alphonse: { radius: 46, speed: 235, spriteH: 165 },
+  alphonse: { radius: 46, speed: 235, spriteH: 165, walkPeriod: 0.42, bob: 11 },
 
   // Zone jouable (à l'intérieur de la couronne d'arbres)
   field: { x: 95, y: 180, w: 530, h: 925 },
@@ -68,7 +68,11 @@ const state = {
   cabins: [],
   particles: [],
   sparkles: [],                  // étoiles SVG à la récolte
+  dust: [],                      // petites poussières sous les pas
   floats: [],                    // textes "+10" / "+3" qui montent
+
+  walkPhase: 0,                  // avance seulement quand Alphonse marche
+  footCyc: 0,                    // pour déclencher la poussière à chaque pas
 
   grassTimer: 1.0,
   woodTimer: 0.5,
@@ -288,7 +292,10 @@ function resetGame() {
   state.cabins.length = 0;
   state.particles.length = 0;
   state.sparkles.length = 0;
+  state.dust.length = 0;
   state.floats.length = 0;
+  state.walkPhase = 0;
+  state.footCyc = 0;
   state.grassTimer = 1.0;
   state.woodTimer = 0.5;
   state.waterStepTimer = 0;
@@ -329,9 +336,23 @@ function update(dt) {
     if (Math.abs(dx) > 4) a.facing = dx > 0 ? 1 : -1;
   }
 
+  // --- Animation de marche : la phase n'avance que s'il bouge ---
+  const walking = d > 4;
+  if (walking) {
+    state.walkPhase += dt;
+    const cyc = Math.floor(state.walkPhase / CONFIG.alphonse.walkPeriod);
+    if (cyc !== state.footCyc) {
+      state.footCyc = cyc;
+      if (!inWater) {                       // poussière au sol, pas dans l'eau
+        state.dust.push({ x: a.x - a.facing * 12, y: a.y + 34,
+                          life: 0.42, max: 0.42 });
+      }
+    }
+  }
+
   // --- Clapotis quand il marche dans l'eau ---
   state.waterStepTimer -= dt;
-  if (inWater && d > 4 && state.waterStepTimer <= 0) {
+  if (inWater && walking && state.waterStepTimer <= 0) {
     Audio.splash();
     state.waterStepTimer = 0.32;
   }
@@ -386,6 +407,11 @@ function update(dt) {
     const s = state.sparkles[i];
     s.y -= 30 * dt; s.rot += 3 * dt; s.life -= dt;
     if (s.life <= 0) state.sparkles.splice(i, 1);
+  }
+  for (let i = state.dust.length - 1; i >= 0; i--) {
+    const d2 = state.dust[i];
+    d2.life -= dt;
+    if (d2.life <= 0) state.dust.splice(i, 1);
   }
   for (let i = state.floats.length - 1; i >= 0; i--) {
     const fl = state.floats[i];
@@ -643,22 +669,60 @@ function drawCabinFallback({ x, y, w, h }) {
 function drawAlphonse() {
   const a = state.alphonse;
   const img = Assets.images.alphonse;
-  // ombre
-  ctx.fillStyle = "rgba(40,70,30,.22)";
-  ctx.beginPath(); ctx.ellipse(a.x, a.y + 30, 52, 18, 0, 0, 6.283); ctx.fill();
+  const A = CONFIG.alphonse;
+  const moving = !state.over && Math.hypot(a.tx - a.x, a.ty - a.y) > 4;
 
-  ctx.save();
-  ctx.translate(a.x, a.y);
-  // petit balancement quand il marche
-  const moving = Math.hypot(a.tx - a.x, a.ty - a.y) > 4;
-  if (moving) ctx.rotate(Math.sin(state.time * 12) * 0.05);
-  ctx.scale(a.facing, 1);
+  // Paramètres d'animation (équivalents canvas des @keyframes CSS proposés)
+  let bob = 0, sx = 1, sy = 1, rot = 0, shScale = 1, shAlpha = 0.22;
 
-  if (img && img.width) {
-    const h = CONFIG.alphonse.spriteH;
-    const w = h * (img.width / img.height);
-    ctx.drawImage(img, -w / 2, -h * 0.78, w, h);
+  if (moving) {
+    const p = (state.walkPhase % A.walkPeriod) / A.walkPeriod;  // 0..1
+    bob = -A.bob * Math.sin(p * Math.PI);            // un rebond par cycle
+    const c = Math.cos(p * 2 * Math.PI);             // +1 au sol, -1 en l'air
+    sx = 1 + 0.06 * c;                               // écrasement / étirement
+    sy = 1 - 0.07 * c;
+    rot = 0.07 * Math.sin(state.walkPhase / A.walkPeriod * Math.PI); // balancement
+    const up = -bob / A.bob;                         // 0 au sol, 1 en haut
+    shScale = 1 - 0.30 * up;                         // ombre qui rétrécit
+    shAlpha = 0.22 - 0.10 * up;
   } else {
+    // À l'arrêt : simple respiration
+    const b = 0.5 + 0.5 * Math.sin(state.time * (2 * Math.PI / 2.4));
+    bob = -1.5 * b;
+    sy = 1 + 0.02 * b;
+    sx = 1 - 0.015 * b;
+    shScale = 1; shAlpha = 0.20;
+  }
+
+  // Ombre (animée)
+  ctx.fillStyle = `rgba(40,70,30,${shAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(a.x, a.y + 30, 52 * shScale, 18 * shScale, 0, 0, 6.283);
+  ctx.fill();
+
+  // Poussière sous les pas
+  for (const d of state.dust) {
+    const k = 1 - d.life / d.max;                    // 0 -> 1 dans le temps
+    ctx.save();
+    ctx.globalAlpha = (1 - k) * 0.45;
+    ctx.fillStyle = "#fbf7ec";
+    ctx.beginPath();
+    ctx.ellipse(d.x, d.y, 12 + k * 20, 6 + k * 9, 0, 0, 6.283);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Corps (pivot = pieds, au niveau de l'ombre)
+  ctx.save();
+  ctx.translate(a.x, a.y + 30);
+  ctx.rotate(rot);
+  ctx.scale(a.facing * sx, sy);
+  if (img && img.width) {
+    const h = A.spriteH;
+    const w = h * (img.width / img.height);
+    ctx.drawImage(img, -w / 2, -h * 0.78 - 30 + bob, w, h);
+  } else {
+    ctx.translate(0, -30 + bob);
     drawFallbackSheep();   // mouton de secours si l'image n'est pas prête
   }
   ctx.restore();
