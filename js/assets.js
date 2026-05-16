@@ -29,11 +29,12 @@ const Assets = {
     let remaining = list.length;
     const done = () => { if (--remaining === 0) { this.loaded = true; onReady(); } };
 
+    const v = window.APP_VERSION ? "?v=" + window.APP_VERSION : "";
     list.forEach(([key, src]) => {
       const img = new Image();
       img.onload = () => { this.images[key] = img; done(); };
       img.onerror = () => { done(); }; // on continue même si une image manque
-      img.src = src;
+      img.src = src + v;               // force le rechargement à chaque version
     });
   },
 

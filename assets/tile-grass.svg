@@ -6,11 +6,7 @@
       <path d="M6 14 L6 11" stroke="#3d7a3d" stroke-width="0.8" stroke-linecap="round" opacity="0.6"></path>
       <path d="M13 5 L13 2" stroke="#3d7a3d" stroke-width="0.8" stroke-linecap="round" opacity="0.6"></path>
     </pattern>
-    <linearGradient id="gT" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#a3d97a"></stop>
-      <stop offset="1" stop-color="#7fc16a"></stop>
-    </linearGradient>
   </defs>
-  <rect width="128" height="128" fill="url(#gT)"></rect>
+  <rect width="128" height="128" fill="#8ecb6e"></rect>
   <rect width="128" height="128" fill="url(#dots)"></rect>
 </svg>

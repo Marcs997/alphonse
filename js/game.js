@@ -461,6 +461,14 @@ function draw() {
   }
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
+  // Un seul grand dégradé doux sur toute la map (profondeur, aucune couture)
+  const og = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+  og.addColorStop(0, "rgba(255,255,255,0.12)");
+  og.addColorStop(0.45, "rgba(255,255,255,0)");
+  og.addColorStop(1, "rgba(25,70,25,0.14)");
+  ctx.fillStyle = og;
+  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
   // --- Mares ---
   for (const p of PONDS) {
     if (!Assets.draw(ctx, "pond", p.x, p.y, p.rx * 1.7)) drawPondFallback(p);

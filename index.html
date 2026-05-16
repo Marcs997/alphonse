@@ -7,7 +7,9 @@
   <meta name="theme-color" content="#7ec850">
   <title>Alphonse</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css">
+  <!-- ?v=… : à incrémenter à chaque version pour forcer le rechargement
+       (sinon le navigateur garde l'ancien code en cache). -->
+  <link rel="stylesheet" href="style.css?v=3.2">
 </head>
 <body>
   <!-- Le jeu entier est dessiné dans ce canvas -->
@@ -15,9 +17,11 @@
     <canvas id="game" width="720" height="1280"></canvas>
   </div>
 
+  <!-- Version globale (sert aussi à recharger les images) -->
+  <script>window.APP_VERSION = "3.2";</script>
   <!-- assets.js charge les images, audio.js le son, game.js tout le jeu -->
-  <script src="js/assets.js"></script>
-  <script src="js/audio.js"></script>
-  <script src="js/game.js"></script>
+  <script src="js/assets.js?v=3.2"></script>
+  <script src="js/audio.js?v=3.2"></script>
+  <script src="js/game.js?v=3.2"></script>
 </body>
 </html>
