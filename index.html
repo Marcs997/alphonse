@@ -7,9 +7,18 @@
   <meta name="theme-color" content="#7ec850">
   <title>Alphonse</title>
   <link rel="icon" href="data:,">
+
+  <!-- Icône quand on ajoute à l'écran d'accueil -->
+  <link rel="manifest" href="manifest.webmanifest?v=3.3">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png?v=3.3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Alphonse">
+  <meta name="mobile-web-app-capable" content="yes">
+
   <!-- ?v=… : à incrémenter à chaque version pour forcer le rechargement
        (sinon le navigateur garde l'ancien code en cache). -->
-  <link rel="stylesheet" href="style.css?v=3.2">
+  <link rel="stylesheet" href="style.css?v=3.3">
 </head>
 <body>
   <!-- Le jeu entier est dessiné dans ce canvas -->
@@ -18,10 +27,10 @@
   </div>
 
   <!-- Version globale (sert aussi à recharger les images) -->
-  <script>window.APP_VERSION = "3.2";</script>
+  <script>window.APP_VERSION = "3.3";</script>
   <!-- assets.js charge les images, audio.js le son, game.js tout le jeu -->
-  <script src="js/assets.js?v=3.2"></script>
-  <script src="js/audio.js?v=3.2"></script>
-  <script src="js/game.js?v=3.2"></script>
+  <script src="js/assets.js?v=3.3"></script>
+  <script src="js/audio.js?v=3.3"></script>
+  <script src="js/game.js?v=3.3"></script>
 </body>
 </html>
