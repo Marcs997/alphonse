@@ -33,6 +33,13 @@ const CONFIG = {
   },
 
   cabin: { w: 150, h: 135, cost: 50 },
+
+  pondSlow: 0.85,                 // dans l'eau : 85 % de la vitesse (-15 %)
+
+  game: {
+    duration: 150,                // une partie dure 2 min 30
+    cabinBonus: 45,               // chaque cabane construite : +45 s
+  },
 };
 
 // Mares (décoratives) : rien n'apparaît dessus
@@ -65,9 +72,13 @@ const state = {
 
   grassTimer: 1.0,
   woodTimer: 0.5,
+  waterStepTimer: 0,             // cadence du clapotis dans l'eau
 
   mode: "play",                  // "play" ou "placing" (pose d'une cabane)
   ghost: { x: WORLD_W / 2, y: 760 }, // aperçu de la cabane à poser
+
+  timeLeft: CONFIG.game.duration, // temps restant (s)
+  over: false,                   // partie terminée ?
 
   time: 0,
 };
@@ -159,6 +170,7 @@ function toWorld(clientX, clientY) {
 // ----------------------------------------------------------------------------
 const BUILD_BTN = { x: 210, y: 1148, w: 300, h: 104 };
 const MUTE_BTN = { x: WORLD_W - 92, y: 124, w: 72, h: 72 };
+const NEWGAME_BTN = { x: 200, y: 760, w: 320, h: 104 };
 
 function pointInRect(px, py, r) {
   return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
@@ -174,6 +186,12 @@ canvas.addEventListener("pointerdown", (e) => {
 
   // Bouton son (toujours accessible)
   if (pointInRect(p.x, p.y, MUTE_BTN)) { Audio.toggleMute(); return; }
+
+  // Écran de fin : seul "Nouvelle partie" répond
+  if (state.over) {
+    if (pointInRect(p.x, p.y, NEWGAME_BTN)) resetGame();
+    return;
+  }
 
   if (state.mode === "placing") {
     // En mode pose : le bouton sert à annuler
@@ -253,7 +271,30 @@ function tryPlaceCabin(x, y) {
   if (inAnyPond(cx, cy, 10)) return;        // pas sur une mare
   state.cabins.push({ x: cx, y: cy, w: c.w, h: c.h });
   state.wood -= c.cost;
+  state.timeLeft += CONFIG.game.cabinBonus;   // +45 s par cabane
   state.mode = "play";
+}
+
+// Recommence une partie (remet tout à zéro, décor inchangé)
+function resetGame() {
+  state.score = 0;
+  state.wood = 0;
+  state.woodUnlocked = false;
+  state.alphonse.x = WORLD_W / 2; state.alphonse.y = 760;
+  state.alphonse.tx = WORLD_W / 2; state.alphonse.ty = 760;
+  state.alphonse.facing = 1;
+  state.grasses.length = 0;
+  state.woods.length = 0;
+  state.cabins.length = 0;
+  state.particles.length = 0;
+  state.sparkles.length = 0;
+  state.floats.length = 0;
+  state.grassTimer = 1.0;
+  state.woodTimer = 0.5;
+  state.waterStepTimer = 0;
+  state.mode = "play";
+  state.timeLeft = CONFIG.game.duration;
+  state.over = false;
 }
 
 // ----------------------------------------------------------------------------
@@ -262,6 +303,16 @@ function tryPlaceCabin(x, y) {
 function update(dt) {
   state.time += dt;
 
+  // --- Chrono de la partie ---
+  if (state.over) return;                 // gel quand la partie est finie
+  state.timeLeft -= dt;
+  if (state.timeLeft <= 0) {
+    state.timeLeft = 0;
+    state.over = true;
+    Audio.endGame();
+    return;
+  }
+
   // --- Déplacement d'Alphonse vers sa cible ---
   const a = state.alphonse;
   const f = CONFIG.field;
@@ -269,11 +320,20 @@ function update(dt) {
   a.ty = clamp(a.ty, f.y, f.y + f.h);
   const dx = a.tx - a.x, dy = a.ty - a.y;
   const d = Math.hypot(dx, dy);
+  const inWater = inAnyPond(a.x, a.y, 0);
   if (d > 2) {
-    const step = Math.min(d, CONFIG.alphonse.speed * dt);
+    const speed = CONFIG.alphonse.speed * (inWater ? CONFIG.pondSlow : 1);
+    const step = Math.min(d, speed * dt);
     a.x += (dx / d) * step;
     a.y += (dy / d) * step;
     if (Math.abs(dx) > 4) a.facing = dx > 0 ? 1 : -1;
+  }
+
+  // --- Clapotis quand il marche dans l'eau ---
+  state.waterStepTimer -= dt;
+  if (inWater && d > 4 && state.waterStepTimer <= 0) {
+    Audio.splash();
+    state.waterStepTimer = 0.32;
   }
 
   // --- Apparition de l'herbe ---
@@ -456,6 +516,9 @@ function draw() {
 
   // --- HUD ---
   drawHUD();
+
+  // --- Écran de fin de partie ---
+  if (state.over) drawGameOver();
 }
 
 // Aura jaune qui pulse et change de teinte
@@ -647,6 +710,28 @@ function drawHUD() {
   ctx.font = "bold 40px system-ui, sans-serif";
   ctx.fillText("Bois " + state.wood, WORLD_W - 214, 64);
 
+  // Chrono (pastille centrée sous la barre)
+  const t = Math.max(0, Math.ceil(state.timeLeft));
+  const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
+  const low = state.timeLeft <= 20;
+  ctx.fillStyle = "rgba(0,0,0,.15)";
+  roundRect(264, 126, 192, 60, 30); ctx.fill();
+  ctx.fillStyle = low ? "rgba(230,116,106,.92)" : "rgba(255,255,255,.85)";
+  roundRect(260, 122, 192, 60, 30); ctx.fill();
+  // petite horloge
+  ctx.save();
+  ctx.translate(296, 152);
+  ctx.strokeStyle = low ? "#fff" : "#5a3a12";
+  ctx.lineWidth = 3; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.arc(0, 0, 13, 0, 6.283); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -8);
+  ctx.moveTo(0, 0); ctx.lineTo(7, 2); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = low ? "#fff" : "#3a2a14";
+  ctx.font = "bold 36px system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(mm + ":" + ss, 318, 153);
+
   // Bouton du bas
   const b = BUILD_BTN;
   const placing = state.mode === "placing";
@@ -708,6 +793,67 @@ function drawMuteButton() {
     ctx.beginPath(); ctx.arc(6, 0, 16, -0.7, 0.7); ctx.stroke();
   }
   ctx.restore();
+}
+
+// Écran de fin de partie
+function drawGameOver() {
+  ctx.fillStyle = "rgba(30,40,20,.62)";
+  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+  // Panneau
+  const px = 80, pw = WORLD_W - 160, py = 430, ph = 460;
+  ctx.fillStyle = "rgba(0,0,0,.18)";
+  roundRect(px, py + 6, pw, ph, 34); ctx.fill();
+  ctx.fillStyle = "#fff7e8";
+  roundRect(px, py, pw, ph, 34); ctx.fill();
+  ctx.strokeStyle = "#e6c98a"; ctx.lineWidth = 4;
+  roundRect(px, py, pw, ph, 34); ctx.stroke();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  ctx.fillStyle = "#5a3a12";
+  ctx.font = "bold 56px system-ui, sans-serif";
+  ctx.fillText("Partie terminée…", WORLD_W / 2, py + 90);
+
+  ctx.fillStyle = "#7c5128";
+  ctx.font = "30px system-ui, sans-serif";
+  wrapText("Construis plus de cabanes la prochaine fois !",
+           WORLD_W / 2, py + 165, pw - 90, 40);
+
+  // Petit récap
+  ctx.fillStyle = "#3a2a14";
+  ctx.font = "bold 34px system-ui, sans-serif";
+  ctx.fillText("Score : " + state.score + "   •   Cabanes : " + state.cabins.length,
+               WORLD_W / 2, py + 270);
+
+  // Bouton "Nouvelle partie"
+  const b = NEWGAME_BTN;
+  ctx.fillStyle = "rgba(0,0,0,.15)";
+  roundRect(b.x, b.y + 5, b.w, b.h, 28); ctx.fill();
+  ctx.fillStyle = "#7ec850";
+  roundRect(b.x, b.y, b.w, b.h, 28); ctx.fill();
+  ctx.strokeStyle = "#4f9a48"; ctx.lineWidth = 4;
+  roundRect(b.x, b.y, b.w, b.h, 28); ctx.stroke();
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 40px system-ui, sans-serif";
+  ctx.fillText("Nouvelle partie", b.x + b.w / 2, b.y + b.h / 2);
+
+  ctx.textBaseline = "alphabetic";
+}
+
+// Texte multi-lignes centré (coupe aux espaces)
+function wrapText(text, cx, cy, maxW, lh) {
+  const words = text.split(" ");
+  let line = "", lines = [];
+  for (const w of words) {
+    const test = line ? line + " " + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  const start = cy - ((lines.length - 1) * lh) / 2;
+  lines.forEach((l, i) => ctx.fillText(l, cx, start + i * lh));
 }
 
 // Rectangle à coins arrondis (utilitaire de dessin)

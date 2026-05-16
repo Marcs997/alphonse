@@ -62,6 +62,49 @@ const Audio = {
     });
   },
 
+  // --- Clapotis : petit bruit d'eau filtré et doux ---
+  splash() {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    const dur = 0.22;
+    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.setValueAtTime(900, t);
+    bp.frequency.exponentialRampToValueAtTime(2200, t + dur);
+    bp.Q.value = 0.8;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.08, t + 0.02);  // discret
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(bp).connect(g).connect(this.master);
+    src.start(t);
+    src.stop(t + dur);
+  },
+
+  // --- Petit son doux de fin de partie (deux notes descendantes) ---
+  endGame() {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    [[659.25, 0], [523.25, 0.22], [392.0, 0.46]].forEach(([f, off]) => {
+      const o = this.ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.value = f;
+      const g = this.ctx.createGain();
+      const s = t + off;
+      g.gain.setValueAtTime(0.0001, s);
+      g.gain.exponentialRampToValueAtTime(0.12, s + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, s + 0.9);
+      o.connect(g).connect(this.master);
+      o.start(s);
+      o.stop(s + 1.0);
+    });
+  },
+
   // --- Musique : boucle douce d'accords + arpège ---
   _startMusic() {
     if (!this.ctx) return;
