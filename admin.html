@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Alphonse — Admin</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f2f5ec; color: #2a2a22; padding: 20px;
+    }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: #6b7a5a; margin: 0 0 20px; font-size: 14px; }
+    .card {
+      background: #fff; border: 1px solid #e2e8d6; border-radius: 14px;
+      padding: 20px; max-width: 520px; box-shadow: 0 4px 14px rgba(60,80,40,.06);
+    }
+    label { display: block; font-size: 14px; margin-bottom: 6px; color: #4a5a3a; }
+    input[type=password] {
+      width: 100%; box-sizing: border-box; padding: 12px 14px; font-size: 16px;
+      border: 1px solid #cdd8bf; border-radius: 10px; margin-bottom: 12px;
+    }
+    button {
+      background: #7ec850; color: #fff; border: 0; border-radius: 10px;
+      padding: 12px 18px; font-size: 16px; font-weight: 700; cursor: pointer;
+    }
+    button:hover { background: #6fb747; }
+    #msg { margin-top: 12px; font-size: 14px; color: #b4524a; min-height: 18px; }
+    #panel { display: none; max-width: 1000px; }
+    #count { color: #6b7a5a; font-size: 14px; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; background: #fff;
+      border: 1px solid #e2e8d6; border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; padding: 10px 12px; font-size: 14px;
+      border-bottom: 1px solid #eef2e6; white-space: nowrap; }
+    th { background: #eef3e4; color: #4a5a3a; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    td.muted { color: #8a967a; font-size: 12px; }
+    .wrap { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>🐑 Alphonse — Administration</h1>
+  <p class="sub">Listing des 100 dernières visites du jeu.</p>
+
+  <!-- Connexion -->
+  <div id="gate" class="card">
+    <form id="login">
+      <label for="pwd">Mot de passe admin</label>
+      <input id="pwd" type="password" autocomplete="current-password" placeholder="••••••••">
+      <button type="submit">Voir les visites</button>
+    </form>
+    <div id="msg"></div>
+  </div>
+
+  <!-- Tableau -->
+  <div id="panel">
+    <p id="count"></p>
+    <div class="wrap">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>IP</th><th>OS</th><th>Appareil</th><th>Navigateur</th><th>Détails</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="js/config.js?v=3.4"></script>
+  <script src="js/admin.js?v=3.4"></script>
+</body>
+</html>
